@@ -29,6 +29,50 @@ def getVProjection(image):
     return w_
 
 
+def splitAlphabet(projectImg, oriImg, resultImg):
+    position = []
+    W = getVProjection(projectImg)
+    H_Start = 0
+    H_End = np.size(projectImg, 0)
+    Wstart = 0
+    Wend = 0
+    W_Start = 0
+    W_End = 0
+    for j in range(len(W)):
+        if W[j] > 0 and Wstart == 0:
+            W_Start = j
+            Wstart = 1
+            Wend = 0
+        if W[j] <= 0 and Wstart == 1:
+            W_End = j
+            Wstart = 0
+            Wend = 1
+        if Wend == 1:
+            position.append([W_Start, H_Start, W_End, H_End])
+            Wend = 0
+    splitImg = []
+    splitImgW = 40  # 切割後固定每張圖的寬度
+    for m in range(len(position)):
+        if oriImg is not None:
+            cv2.rectangle(oriImg, (position[m][0], position[m][1]), (position[m][2], position[m][3]), (0, 255, 255),
+                          1)
+        tmpH = position[m][3] - position[m][1]
+        tmpW = position[m][2] - position[m][0]
+        tmpImg = resultImg[position[m][1]:position[m][1] + tmpH, position[m][0]:position[m][0] + tmpW]
+        tmpW = tmpImg.shape[1]
+        paddingW = int(splitImgW / 2 - tmpW / 2)
+        # 切割後等寬
+        if tmpW < splitImgW:
+            if tmpW % 2 > 0:
+                tmpImg = cv2.copyMakeBorder(tmpImg, 0, 0, paddingW + 1, paddingW, cv2.BORDER_CONSTANT,
+                                            value=[255, 255, 255])
+            else:
+                tmpImg = cv2.copyMakeBorder(tmpImg, 0, 0, paddingW, paddingW, cv2.BORDER_CONSTANT,
+                                            value=[255, 255, 255])
+        splitImg.append(tmpImg)
+    return splitImg
+
+
 def findPaths(directory):
     # directory = r'/Users/moriakiraakira/Desktop/OCR_Sample/cathayOCR/Source'
     filePaths = []
@@ -40,18 +84,18 @@ def findPaths(directory):
     return filePaths
 
 
-def cathayOCR(origineImage, resize_num=3, threshold=150, erodeIterationTimes=3, dilateIterationTimes=3,
-              medianBlurKernel=7, isRevert=True):
-    isShowImg = True
+def processImg(oriImg, resize_num, threshold, erodeIterationTimes, dilateIterationTimes,
+               medianBlurKernel, isRevert):
+    isShowImg = False
 
-    origineImage = cv2.copyMakeBorder(origineImage, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=[255, 255, 255])
+    oriImg = cv2.copyMakeBorder(oriImg, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=[255, 255, 255])
     # resize
-    origineImage = cv2.resize(origineImage,
-                              (origineImage.shape[1] * int(resize_num), origineImage.shape[0] * int(resize_num)),
-                              interpolation=cv2.INTER_CUBIC)
+    oriImg = cv2.resize(oriImg,
+                        (oriImg.shape[1] * int(resize_num), oriImg.shape[0] * int(resize_num)),
+                        interpolation=cv2.INTER_CUBIC)
 
     # gray
-    grayImg = cv2.cvtColor(origineImage, cv2.COLOR_BGR2GRAY)
+    grayImg = cv2.cvtColor(oriImg, cv2.COLOR_BGR2GRAY)
 
     # sharpen
     kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]], np.float32)
@@ -76,45 +120,7 @@ def cathayOCR(origineImage, resize_num=3, threshold=150, erodeIterationTimes=3, 
         resultImg = medianBImg
 
     # 分割
-    Position = []
-    W = getVProjection(medianBImg)
-    H_Start = 0
-    H_End = np.size(medianBImg, 0)
-    Wstart = 0
-    Wend = 0
-    W_Start = 0
-    W_End = 0
-    for j in range(len(W)):
-        if W[j] > 0 and Wstart == 0:
-            W_Start = j
-            Wstart = 1
-            Wend = 0
-        if W[j] <= 0 and Wstart == 1:
-            W_End = j
-            Wstart = 0
-            Wend = 1
-        if Wend == 1:
-            Position.append([W_Start, H_Start, W_End, H_End])
-            Wend = 0
-    splitImg = []
-    splitImgW = 40  # 切割後固定每張圖的寬度
-    for m in range(len(Position)):
-        cv2.rectangle(origineImage, (Position[m][0], Position[m][1]), (Position[m][2], Position[m][3]), (0, 255, 255),
-                      1)
-        tmpH = Position[m][3] - Position[m][1]
-        tmpW = Position[m][2] - Position[m][0]
-        tmpImg = resultImg[Position[m][1]:Position[m][1] + tmpH, Position[m][0]:Position[m][0] + tmpW]
-        tmpW = tmpImg.shape[1]
-        paddingW = int(splitImgW / 2 - tmpW / 2)
-        # 切割後等寬
-        if tmpW < splitImgW:
-            if tmpW % 2 > 0:
-                tmpImg = cv2.copyMakeBorder(tmpImg, 0, 0, paddingW + 1, paddingW, cv2.BORDER_CONSTANT,
-                                            value=[255, 255, 255])
-            else:
-                tmpImg = cv2.copyMakeBorder(tmpImg, 0, 0, paddingW, paddingW, cv2.BORDER_CONSTANT,
-                                            value=[255, 255, 255])
-        splitImg.append(tmpImg)
+    splitImgs = splitAlphabet(projectImg=medianBImg, oriImg=oriImg, resultImg=resultImg)
 
     # -----------------------------------
     # contour
@@ -124,8 +130,8 @@ def cathayOCR(origineImage, resize_num=3, threshold=150, erodeIterationTimes=3, 
     #     x, y, w, h = cv2.boundingRect(c)
     #     if w>w_max:
     #         w_max = w
-    #     #cv2.rectangle(origineImage, (x, y), (x + w, y + h), (0, 255, 0), 2, cv2.LINE_AA)
-    # #cv2.imshow('origineImage', origineImage)
+    #     #cv2.rectangle(oriImg, (x, y), (x + w, y + h), (0, 255, 0), 2, cv2.LINE_AA)
+    # #cv2.imshow('oriImg', oriImg)
     # print('w_max:',w_max)
     # result = []
     # tmpRotate=[]
@@ -150,14 +156,14 @@ def cathayOCR(origineImage, resize_num=3, threshold=150, erodeIterationTimes=3, 
     # npTmpRotate = np.array(tmpRotate)
     # #畫旋轉框
     # #for box in npTmpRotate:
-    #     #cv2.drawContours(origineImage, [box], 0, (255, 255, 0), 2)
+    #     #cv2.drawContours(oriImg, [box], 0, (255, 255, 0), 2)
     # #畫一般框
     # #for box in npresult:
-    #     #cv2.drawContours(origineImage, [box], 0, (0, 0, 1), 1)
+    #     #cv2.drawContours(oriImg, [box], 0, (0, 0, 1), 1)
 
     # 秀圖
     if isShowImg:
-        plt.subplot(331), plt.title('oriImg'), plt.imshow(origineImage)
+        plt.subplot(331), plt.title('oriImg'), plt.imshow(oriImg)
         plt.subplot(332), plt.title('grayImg'), plt.imshow(grayImg, cmap='gray', vmin=0, vmax=255)
         plt.subplot(333), plt.title('sharpenImg'), plt.imshow(sharpenImg, cmap='gray', vmin=0, vmax=255)
 
@@ -167,13 +173,21 @@ def cathayOCR(origineImage, resize_num=3, threshold=150, erodeIterationTimes=3, 
         plt.subplot(337), plt.title('medianBlur'), plt.imshow(medianBImg, cmap='gray', vmin=0, vmax=255)
         plt.subplot(338), plt.title('resultImg'), plt.imshow(resultImg, cmap='gray', vmin=0, vmax=255)
         plt.show()
-        for i in range(len(splitImg)):
-            plt.subplot(220 + i + 1), plt.imshow(splitImg[i], cmap='gray', vmin=0, vmax=255)
+        for i in range(len(splitImgs)):
+            plt.subplot(220 + i + 1), plt.imshow(splitImgs[i], cmap='gray', vmin=0, vmax=255)
         plt.show()
+    return splitImgs
+
+
+# best[3,150,3,3,7]
+def cathayOCR(oriImg, resize_num=3, threshold=150, erodeIterationTimes=3, dilateIterationTimes=3,
+              medianBlurKernel=7, isRevert=True):
+    splitImgs = processImg(oriImg, resize_num, threshold, erodeIterationTimes, dilateIterationTimes, medianBlurKernel,
+                           isRevert)
 
     # 產出切割文字檔
     resultText = []
-    for img in splitImg:
+    for img in splitImgs:
         resultChar = pytesseract.image_to_string(img, lang='eng',
                                                  config='--psm 10 -c tessedit_char_whitelist=abcdefghijklmnopqrstuvwxyz0123456789')
         timestamp = int(time.time() * 1e6)
@@ -192,5 +206,5 @@ if __name__ == "__main__":
     # 滾來源資料夾所有檔案 直接產出切割檔
     filePaths = findPaths(r'/Users/moriakiraakira/Desktop/OCR_Sample/cathayOCR/Source')
     for filePath in filePaths:
-        origineImage = cv2.imread(filePath)
-        print(cathayOCR(origineImage))
+        oriImg = cv2.imread(filePath)
+        print(cathayOCR(oriImg))
