@@ -11,3 +11,6 @@ data:訓練的資料圖
 predicting.py：讀取欲辨別的圖片，call訓練好的model（weights_data夾內）
 training_tf.py:training function
 
+
+所有樣本共150000張圖片，epoch設15->一次取10000張，batch size設100->10000(張)/100(size)=100(次)->一次epoch跑100次
+
