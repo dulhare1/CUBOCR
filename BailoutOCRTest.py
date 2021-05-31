@@ -3,7 +3,7 @@ import pytesseract
 import numpy as np
 import matplotlib.pyplot as plt
 
-
+# https://guar.smeg.org.tw/Login.aspx
 def processBailoutImage(oriImg):
     isShowImg = True
     resize_num = 5
