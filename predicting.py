@@ -1,7 +1,9 @@
 from keras.applications.imagenet_utils import preprocess_input
 from keras.preprocessing import image
 from keras.models import model_from_yaml
-from resnet50.lib.preprocess import split_image
+# CUBFirstTest
+# from resnet50.lib.preprocess import split_image
+from resnet50.lib.BailoutPreprocess import split_image
 # from keras.models import load_model
 import yaml
 import numpy as np
@@ -58,11 +60,17 @@ def change_result(x):
 """預測結果"""
 def predict():
     model = load_model() # 讀取參數
+    result = 0
+    totalcnt = 0
 
     for (folder, dirnames, filenames) in os.walk(test_path):
         for filename in filenames:
+            if 'DS' in filename:
+                continue
+
             img_path = folder + '/' + filename
             answer_lst=[]
+            # print(img_path)
             imgs = split_image(img_path)
             for img in imgs:
                 img = image.load_img(img, target_size=(size, size)) # 讀取照片
@@ -71,7 +79,13 @@ def predict():
                 img = preprocess_input(img)
                 preds = np.argmax(model.predict(img), axis=-1)
                 answer_lst.append(change_result(str(preds[0])))
-            print('結果 : ' +''.join(answer_lst) + ', 正確答案 : ' + filename.split('.')[0])
+
+            if ''.join(answer_lst) == filename.split('.')[0]:
+                result = result + 1
+            else:
+                print('結果 : ' + ''.join(answer_lst) + ', 正確答案 : ' + filename.split('.')[0])
+            totalcnt = totalcnt + 1
+        print('辨識筆數:'+str(totalcnt)+',正確筆數:'+str(result)+',正確率:'+str(result/totalcnt*100)+'%')
 
 if __name__ == '__main__':
     predict()
